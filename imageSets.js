@@ -14,7 +14,6 @@ class ImageSets {
   }
 
   completeProcessing({id, tags}) {
-    console.log(tags);
     this.jobs[id].status = 'completed';
     this.jobs[id].completedAt = new Date();
     this.jobs[id].tags = tags;

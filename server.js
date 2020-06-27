@@ -1,20 +1,10 @@
 const express = require('express');
-const http = require('http');
 const app = express();
 const {ImageSets} = require('./imageSets');
+const {Schedular} = require('./schedular');
 const port = process.env.port || 8080;
 
-let isWorkerFree = true;
-const jobs = [];
 const imageSets = new ImageSets();
-
-setInterval(() => {
-  if (isWorkerFree && jobs.length > 0) {
-    const job = jobs.shift();
-    delegateToWorker(job);
-  }
-}, 1000);
-
 const getWorkerOptions = () => {
   return {
     host: 'localhost',
@@ -22,6 +12,9 @@ const getWorkerOptions = () => {
     method: 'POST',
   };
 };
+
+const schedular = new Schedular(getWorkerOptions());
+schedular.start(1000);
 
 app.use((req, res, next) => {
   console.log(`${req.url} ${req.method}`);
@@ -36,23 +29,13 @@ app.get('/status/:id', (req, res) => {
 
 app.post('/completedJob/:id/:tags', (req, res) => {
   imageSets.completeProcessing(req.params);
-  isWorkerFree = true;
+  schedular.setWorkerFree();
   res.end();
 });
 
-const delegateToWorker = function ({id, count, height, width, tags}) {
-  const options = getWorkerOptions();
-  options.path = `/process/${id}/${count}/${height}/${width}/${tags}`;
-  const req = http.request(options, (res, err) => {
-    console.log('Got from worker', res.statusCode);
-  });
-  isWorkerFree = false;
-  req.end();
-};
-
 app.post('/process/:name/:count/:height/:width/:tags', (req, res) => {
   const job = imageSets.addImageSet(req.params);
-  jobs.push(job);
+  schedular.schedule(job);
   res.send(`${job.id}`);
   res.end();
 });

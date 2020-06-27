@@ -26,13 +26,18 @@ const informWorkerFree = function ({id, tags}) {
   req.end();
 };
 
-app.post('/process/:id/:count/:height/:width/:tags', (req, res) => {
+app.post('/process/', (req, res) => {
+  let data = '';
+  req.on('data', (chunk) => (data += chunk));
+  req.on('end', () => {
+    const params = JSON.parse(data);
+    processImage(params)
+      .then((tags) => {
+        return {id: params.id, tags};
+      })
+      .then(informWorkerFree);
+  });
   res.end();
-  processImage(req.params)
-    .then((tags) => {
-      return {id: req.params.id, tags};
-    })
-    .then(informWorkerFree);
 });
 
 app.listen(port, () => console.log(`app is listening on port ${port}`));
