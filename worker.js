@@ -17,9 +17,9 @@ app.use((req, res, next) => {
   next();
 });
 
-const informWorkerFree = function (id, tags) {
+const informWorkerFree = function ({id, tags}) {
   const options = getServerOptions();
-  options.path = `/process/completedJob/${id}/${tags}`;
+  options.path = `/completedJob/${id}/${tags}`;
   const req = http.request(options, (res, err) => {
     console.log('Got from server', res.statusCode);
   });
@@ -27,16 +27,12 @@ const informWorkerFree = function (id, tags) {
 };
 
 app.post('/process/:id/:count/:height/:width/:tags', (req, res) => {
+  res.end();
   processImage(req.params)
     .then((tags) => {
-      console.log(tags);
-      return tags;
+      return {id: req.params.id, tags};
     })
-    .then((tags) => {
-      informWorkerFree(req.params.id, tags);
-      res.write(JSON.stringify(tags));
-      res.end();
-    });
+    .then(informWorkerFree);
 });
 
 app.listen(port, () => console.log(`app is listening on port ${port}`));
