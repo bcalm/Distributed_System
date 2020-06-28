@@ -1,9 +1,9 @@
 const express = require('express');
 const http = require('http');
 const app = express();
-const {processImage} = require('./processImage');
-const port = 5000;
+const { processImage } = require('./processImage');
 
+let agentId;
 const getServerOptions = () => {
   return {
     host: 'localhost',
@@ -17,9 +17,9 @@ app.use((req, res, next) => {
   next();
 });
 
-const informWorkerFree = function ({id, tags}) {
+const informWorkerFree = function ({ id, tags }) {
   const options = getServerOptions();
-  options.path = `/completedJob/${id}/${tags}`;
+  options.path = `/completedJob/${agentId}/${id}/${tags}`;
   const req = http.request(options, (res, err) => {
     console.log('Got from server', res.statusCode);
   });
@@ -33,11 +33,16 @@ app.post('/process/', (req, res) => {
     const params = JSON.parse(data);
     processImage(params)
       .then((tags) => {
-        return {id: params.id, tags};
+        return { id: params.id, tags };
       })
       .then(informWorkerFree);
   });
   res.end();
 });
 
-app.listen(port, () => console.log(`app is listening on port ${port}`));
+const main = function (port, id) {
+  agentId = id;
+  app.listen(port, () => console.log(`app is listening on port ${port}`));
+};
+
+main(+process.argv[2], +process.argv[3]);

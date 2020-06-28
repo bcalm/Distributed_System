@@ -1,20 +1,23 @@
 const express = require('express');
 const app = express();
-const {ImageSets} = require('./imageSets');
-const {Schedular} = require('./schedular');
+const { ImageSets } = require('./imageSets');
+const { Schedular } = require('./schedular');
+const { Agent } = require('./agent');
 const port = process.env.port || 8080;
 
 const imageSets = new ImageSets();
-const getWorkerOptions = () => {
+
+const getAgentOptions = (port) => {
   return {
     host: 'localhost',
-    port: '5000',
+    port: port,
     method: 'POST',
   };
 };
 
-const schedular = new Schedular(getWorkerOptions());
-schedular.start(1000);
+const schedular = new Schedular();
+schedular.addAgent(new Agent(getAgentOptions(5000), 1));
+schedular.addAgent(new Agent(getAgentOptions(5001), 2));
 
 app.use((req, res, next) => {
   console.log(`${req.url} ${req.method}`);
@@ -27,9 +30,10 @@ app.get('/status/:id', (req, res) => {
   res.end();
 });
 
-app.post('/completedJob/:id/:tags', (req, res) => {
+app.post('/completedJob/:agentId/:id/:tags', (req, res) => {
   imageSets.completeProcessing(req.params);
-  schedular.setWorkerFree();
+  schedular.setWorkerFree(+req.params.agentId);
+  console.log(+req.params.id);
   res.end();
 });
 
