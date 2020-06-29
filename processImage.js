@@ -1,4 +1,4 @@
-const processImage = function ({count, height, width, tags}) {
+const processImage = function ({ count, height, width, tags }) {
   return new Promise((resolve, reject) => {
     let a = 0;
     let b = 0;
@@ -14,4 +14,4 @@ const processImage = function ({count, height, width, tags}) {
   });
 };
 
-module.exports = {processImage};
+module.exports = { processImage };

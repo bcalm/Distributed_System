@@ -12,9 +12,8 @@ class Schedular {
 
   schedule(job) {
     const agent = this.agents.find((agent) => agent.isFree);
-    console.log(this.agents);
     if (agent) {
-      this.delegateToWorker(job, agent);
+      this.delegateToWorker(job.id, agent);
     } else {
       this.jobs.push(job);
     }
@@ -25,7 +24,7 @@ class Schedular {
     agent.isFree = true;
     if (this.jobs.length > 0) {
       const job = this.jobs.shift();
-      this.delegateToWorker(job, agent);
+      this.delegateToWorker(job.id, agent);
     }
   }
 

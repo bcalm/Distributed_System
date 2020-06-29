@@ -1,27 +1,47 @@
-class ImageSets {
-  constructor() {
-    this.jobs = {};
-    this.id = 0;
-  }
+const getCurrId = (client) => {
+  return new Promise((res, rej) => {
+    client.incr('curr_id', (err, id) => {
+      res(id);
+    });
+  });
+};
 
-  addImageSet(imageSet) {
-    const jobToSchedule = Object.assign({id: this.id}, imageSet);
-    this.jobs[this.id] = Object.assign({}, jobToSchedule);
-    this.jobs[this.id].status = 'scheduled';
-    this.jobs[this.id].receivedAt = new Date();
-    this.id++;
-    return jobToSchedule;
-  }
+const createJob = (client, id, imageSet) => {
+  const statusDetails = ['status', 'schedule'];
+  const receivingDetails = ['receivedAt', new Date()];
+  const imageSets = Object.keys(imageSet).reduce((list, set) => {
+    list.push(set, imageSet[set]);
+    return list;
+  }, []);
+  const jobDetails = statusDetails.concat(receivingDetails, imageSets);
+  return new Promise((resolve, reject) => {
+    client.hmset(`job_${id}`, jobDetails, (err, res) => {
+      resolve(Object.assign({ id: id }, imageSet));
+    });
+  });
+};
 
-  completeProcessing({id, tags}) {
-    this.jobs[id].status = 'completed';
-    this.jobs[id].completedAt = new Date();
-    this.jobs[id].tags = tags;
-  }
+const addImageSet = (client, imageSet) => {
+  return getCurrId(client).then((id) => createJob(client, id, imageSet));
+};
 
-  get(id) {
-    return Object.assign({}, this.jobs[id]);
-  }
-}
+const completeProcessing = (client, { id, tags }) => {
+  const statusDetails = ['status', 'completed'];
+  const completionDetails = ['completedAt', new Date()];
+  const details = statusDetails.concat(tags, completionDetails);
+  return new Promise((resolve, rej) => {
+    client.hmset(`job_${id}`, details, (err, res) => {
+      resolve(res);
+    });
+  });
+};
 
-module.exports = {ImageSets};
+const get = (client, id) => {
+  return new Promise((resolve, rej) => {
+    client.hgetall(`job_${id}`, (err, res) => {
+      resolve(res);
+    });
+  });
+};
+
+module.exports = { addImageSet, completeProcessing, get };

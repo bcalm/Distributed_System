@@ -1,11 +1,12 @@
 const express = require('express');
 const app = express();
-const { ImageSets } = require('./imageSets');
+const imageSets = require('./imageSets');
 const { Schedular } = require('./schedular');
 const { Agent } = require('./agent');
 const port = process.env.port || 8080;
+const redis = require('redis');
 
-const imageSets = new ImageSets();
+const redisClient = redis.createClient({ db: 1 });
 
 const getAgentOptions = (port) => {
   return {
@@ -25,23 +26,23 @@ app.use((req, res, next) => {
 });
 
 app.get('/status/:id', (req, res) => {
-  const imageSet = imageSets.get(req.params.id);
-  res.write(JSON.stringify(imageSet));
-  res.end();
+  imageSets.get(redisClient, req.params.id).then((imageSet) => {
+    res.write(JSON.stringify(imageSet));
+    res.end();
+  });
 });
 
-app.post('/completedJob/:agentId/:id/:tags', (req, res) => {
-  imageSets.completeProcessing(req.params);
+app.post('/completedJob/:agentId/', (req, res) => {
   schedular.setWorkerFree(+req.params.agentId);
-  console.log(+req.params.id);
   res.end();
 });
 
 app.post('/process/:name/:count/:height/:width/:tags', (req, res) => {
-  const job = imageSets.addImageSet(req.params);
-  schedular.schedule(job);
-  res.send(`${job.id}`);
-  res.end();
+  imageSets.addImageSet(redisClient, req.params).then((job) => {
+    schedular.schedule(job);
+    res.send(`${job.id}`);
+    res.end();
+  });
 });
 
 app.listen(port, () => console.log(`app is listening on port ${port}`));

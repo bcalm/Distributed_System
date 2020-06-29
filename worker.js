@@ -2,6 +2,10 @@ const express = require('express');
 const http = require('http');
 const app = express();
 const { processImage } = require('./processImage');
+const imageSets = require('./imageSets');
+const redis = require('redis');
+
+const redisClient = redis.createClient({ db: 1 });
 
 let agentId;
 const getServerOptions = () => {
@@ -17,9 +21,10 @@ app.use((req, res, next) => {
   next();
 });
 
-const informWorkerFree = function ({ id, tags }) {
+const informWorkerFree = function (params) {
+  imageSets.completeProcessing(redisClient, params);
   const options = getServerOptions();
-  options.path = `/completedJob/${agentId}/${id}/${tags}`;
+  options.path = `/completedJob/${agentId}/`;
   const req = http.request(options, (res, err) => {
     console.log('Got from server', res.statusCode);
   });
@@ -27,15 +32,16 @@ const informWorkerFree = function ({ id, tags }) {
 };
 
 app.post('/process/', (req, res) => {
-  let data = '';
-  req.on('data', (chunk) => (data += chunk));
+  let id = '';
+  req.on('data', (chunk) => (id += chunk));
   req.on('end', () => {
-    const params = JSON.parse(data);
-    processImage(params)
-      .then((tags) => {
-        return { id: params.id, tags };
-      })
-      .then(informWorkerFree);
+    imageSets.get(redisClient, id).then((params) => {
+      processImage(params)
+        .then((tags) => {
+          return { id, tags };
+        })
+        .then(informWorkerFree);
+    });
   });
   res.end();
 });
