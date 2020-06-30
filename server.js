@@ -6,14 +6,6 @@ const port = process.env.port || 8080;
 const redis = require('redis');
 
 const redisClient = redis.createClient({ db: 1 });
-const getQBOptions = () => {
-  return {
-    host: 'localhost',
-    port: '8000',
-    method: 'post',
-    path: '/queue-job',
-  };
-};
 
 app.use((req, res, next) => {
   console.log(`${req.url} ${req.method}`);
@@ -29,14 +21,11 @@ app.get('/status/:id', (req, res) => {
 
 app.post('/process/:name/:count/:height/:width/:tags', (req, res) => {
   imageSets.addImageSet(redisClient, req.params).then((job) => {
-    const qbOptions = getQBOptions();
-    qbOptions.path += `/${job.id}`;
-    const req = http.request(qbOptions, (req, res) => {
+    redisClient.rpush('queue', job.id, (err, res) => {
       console.log('Added to the queue', job.id);
     });
     res.send(`${job.id}`);
     res.end();
-    req.end();
   });
 });
 

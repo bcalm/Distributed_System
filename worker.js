@@ -5,40 +5,22 @@ const redis = require('redis');
 
 const redisClient = redis.createClient({ db: 1 });
 
-const getServerOptions = () => {
-  return {
-    host: 'localhost',
-    port: '8000',
-    path: '/request-job',
-  };
-};
-
 const getJob = () => {
   return new Promise((resolve, reject) => {
-    const options = getServerOptions();
-    const req = http.request(options, (res, err) => {
-      let data = '';
-      res.on('data', (chunk) => (data += chunk));
-      res.on('end', () => {
-        console.log(data);
-        if (JSON.parse(data).id !== undefined) resolve(data);
-        else reject('no job');
-      });
+    redisClient.blpop('queue', 1, (err, res) => {
+      if (res) resolve(res[1]);
+      else reject('no job');
     });
-    req.end();
   });
 };
 
 const runLoop = () => {
   getJob()
-    .then((data) => {
-      const params = JSON.parse(data);
+    .then((id) => {
       imageSets
-        .get(redisClient, params.id)
+        .get(redisClient, id)
         .then((imageSet) =>
-          processImage(imageSet).then((tags) =>
-            imageSets.completeProcessing(redisClient, params.id, tags)
-          )
+          processImage(imageSet).then((tags) => imageSets.completeProcessing(redisClient, id, tags))
         )
         .then(runLoop);
     })
