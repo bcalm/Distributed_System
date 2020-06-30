@@ -1,54 +1,53 @@
-const express = require('express');
 const http = require('http');
-const app = express();
 const { processImage } = require('./processImage');
 const imageSets = require('./imageSets');
 const redis = require('redis');
 
 const redisClient = redis.createClient({ db: 1 });
 
-let agentId;
 const getServerOptions = () => {
   return {
     host: 'localhost',
-    port: '8080',
-    method: 'POST',
+    port: '8000',
+    path: '/request-job',
   };
 };
 
-app.use((req, res, next) => {
-  console.log(`${req.url} ${req.method}`);
-  next();
-});
-
-const informWorkerFree = function (params) {
-  imageSets.completeProcessing(redisClient, params);
-  const options = getServerOptions();
-  options.path = `/completedJob/${agentId}/`;
-  const req = http.request(options, (res, err) => {
-    console.log('Got from server', res.statusCode);
-  });
-  req.end();
-};
-
-app.post('/process/', (req, res) => {
-  let id = '';
-  req.on('data', (chunk) => (id += chunk));
-  req.on('end', () => {
-    imageSets.get(redisClient, id).then((params) => {
-      processImage(params)
-        .then((tags) => {
-          return { id, tags };
-        })
-        .then(informWorkerFree);
+const getJob = () => {
+  return new Promise((resolve, reject) => {
+    const options = getServerOptions();
+    const req = http.request(options, (res, err) => {
+      let data = '';
+      res.on('data', (chunk) => (data += chunk));
+      res.on('end', () => {
+        console.log(data);
+        if (JSON.parse(data).id !== undefined) resolve(data);
+        else reject('no job');
+      });
     });
+    req.end();
   });
-  res.end();
-});
-
-const main = function (port, id) {
-  agentId = id;
-  app.listen(port, () => console.log(`app is listening on port ${port}`));
 };
 
-main(+process.argv[2], +process.argv[3]);
+const runLoop = () => {
+  getJob()
+    .then((data) => {
+      const params = JSON.parse(data);
+      imageSets
+        .get(redisClient, params.id)
+        .then((imageSet) =>
+          processImage(imageSet).then((tags) =>
+            imageSets.completeProcessing(redisClient, params.id, tags)
+          )
+        )
+        .then(runLoop);
+    })
+    .catch((err) => {
+      console.log(err);
+      setTimeout(() => {
+        runLoop();
+      }, 1000);
+    });
+};
+
+runLoop();

@@ -1,24 +1,19 @@
 const express = require('express');
 const app = express();
+const http = require('http');
 const imageSets = require('./imageSets');
-const { Schedular } = require('./schedular');
-const { Agent } = require('./agent');
 const port = process.env.port || 8080;
 const redis = require('redis');
 
 const redisClient = redis.createClient({ db: 1 });
-
-const getAgentOptions = (port) => {
+const getQBOptions = () => {
   return {
     host: 'localhost',
-    port: port,
-    method: 'POST',
+    port: '8000',
+    method: 'post',
+    path: '/queue-job',
   };
 };
-
-const schedular = new Schedular();
-schedular.addAgent(new Agent(getAgentOptions(5000), 1));
-schedular.addAgent(new Agent(getAgentOptions(5001), 2));
 
 app.use((req, res, next) => {
   console.log(`${req.url} ${req.method}`);
@@ -32,16 +27,16 @@ app.get('/status/:id', (req, res) => {
   });
 });
 
-app.post('/completedJob/:agentId/', (req, res) => {
-  schedular.setWorkerFree(+req.params.agentId);
-  res.end();
-});
-
 app.post('/process/:name/:count/:height/:width/:tags', (req, res) => {
   imageSets.addImageSet(redisClient, req.params).then((job) => {
-    schedular.schedule(job);
+    const qbOptions = getQBOptions();
+    qbOptions.path += `/${job.id}`;
+    const req = http.request(qbOptions, (req, res) => {
+      console.log('Added to the queue', job.id);
+    });
     res.send(`${job.id}`);
     res.end();
+    req.end();
   });
 });
 

@@ -25,7 +25,7 @@ const addImageSet = (client, imageSet) => {
   return getCurrId(client).then((id) => createJob(client, id, imageSet));
 };
 
-const completeProcessing = (client, { id, tags }) => {
+const completeProcessing = (client, id, tags) => {
   const statusDetails = ['status', 'completed'];
   const completionDetails = ['completedAt', new Date()];
   const details = statusDetails.concat(tags, completionDetails);
